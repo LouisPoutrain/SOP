@@ -26,7 +26,6 @@ class ExecutionPlotter:
             # Styles selon le type
             if msg["type"] == "MARKER":
                 color = 'red'
-                style = '--'
                 width = 1
                 label = "" # On n'écrit pas "MARKER" pour ne pas surcharger
             else:
@@ -68,7 +67,7 @@ class ExecutionPlotter:
             sorted_points = sorted(zip(snapshot_ys, snapshot_xs))
             sy = [p[0] for p in sorted_points]
             sx = [p[1] for p in sorted_points]
-            ax.plot(sx, sy, color='orange', linestyle=':', linewidth=2, label='Coupure (Snapshot)')
+            ax.plot(sx, sy, color='green', linestyle=':', linewidth=2, label='Coupure (Snapshot)')
 
         # Décoration
         ax.set_xlabel("Temps Logique")
@@ -82,9 +81,9 @@ class ExecutionPlotter:
         from matplotlib.lines import Line2D
         legend_elements = [
             Line2D([0], [0], color='blue', lw=2, label='Application Msg'),
-            Line2D([0], [0], color='red', lw=1, linestyle='--', label='Marker Msg'),
+            Line2D([0], [0], color='red', lw=1,  label='Marker Msg'),
             Line2D([0], [0], marker='o', color='w', markerfacecolor='red', label='Prise d\'État Local'),
-            Line2D([0], [0], color='orange', linestyle=':', label='Ligne de Coupure')
+            Line2D([0], [0], color='green', linestyle=':', label='Ligne de Coupure')
         ]
         ax.legend(handles=legend_elements, loc='upper right')
 
