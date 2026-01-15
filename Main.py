@@ -34,10 +34,10 @@ def run_simulation():
 
     # === ÉTAPE 1 : Trafic Initial (Avant Snapshot) ===
     # Correspond au message H -> F (P3 vers P2) sur votre image
-    schedule_send(1, p3, "P2", "Msg H->F")
+    schedule_send(1, p3, "P2", "Msg 3->2")
     
     # Correspond au message B -> E (P1 vers P2)
-    schedule_send(2, p1, "P2", "Msg B->E")
+    schedule_send(2, p1, "P2", "Msg 1->2")
 
     # === ÉTAPE 2 : Le Snapshot (Point S1) ===
     # P1 initie le snapshot après avoir envoyé B
@@ -53,14 +53,13 @@ def run_simulation():
     # P1 ayant commencé son snapshot à T=6, il sera en train d'enregistrer le canal P2->P1.
     # P1 recevra le marqueur de retour de P2 seulement vers T=16 (approx).
     # Donc ce message sera CAPTURÉ (c21).
-    schedule_send(8, p2, "P1", "Msg G->D")
+    schedule_send(8, p2, "P1", "Msg 2->1")
 
-    schedule_send(15, p1, "P4", "Msg K->L")
+    schedule_send(15, p1, "P4", "Msg 1->4")
 
     # === ÉTAPE 4 : Trafic Post-Snapshot ===
     # Correspond au message E -> J (P1 vers P3) sur votre image (droite du schéma)
-    schedule_send(20, p1, "P3", "Msg E->J")
-
+    schedule_send(20, p1, "P3", "Msg 1->3")
     # 5. Lancer la simulation
     sim.run()
 
