@@ -75,7 +75,7 @@ class TestFIFO(unittest.TestCase):
         # Pour garantir le FIFO dans notre simulateur à événements discrets,
         # l'événement d'envoi de M2 se produit techniquement APRES M1.
         # Donc M2 part à t=1 (fictif), arrive à t=6.
-        # Astuce de test : on décale légèrement le trigger time pour simuler la séquence.
+        # Astuce pour test : on décale légèrement le trigger time pour simuler la séquence.
         
         # On suppose que le simulateur a avancé (ou on schedule avec un décalage)
         msg2 = Message("P_SEND", "M2")
