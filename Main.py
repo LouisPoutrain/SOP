@@ -11,16 +11,19 @@ def run_simulation():
     p1 = Process("P1", sim)
     p2 = Process("P2", sim)
     p3 = Process("P3", sim)
+    p4 = Process("P4", sim)
 
     sim.register_process(p1)
     sim.register_process(p2)
     sim.register_process(p3)
+    sim.register_process(p4)
 
     # 3. Topologie "Mesh" (Tout le monde connecté à tout le monde)
     # Nécessaire pour que les marqueurs circulent partout comme sur le schéma
-    p1.setup_topology(incoming=["P2", "P3"], outgoing=["P2", "P3"])
-    p2.setup_topology(incoming=["P1", "P3"], outgoing=["P1", "P3"])
-    p3.setup_topology(incoming=["P1", "P2"], outgoing=["P1", "P2"])
+    p1.setup_topology(incoming=["P2", "P3", "P4"], outgoing=["P2", "P3", "P4"])
+    p2.setup_topology(incoming=["P1", "P3", "P4"], outgoing=["P1", "P3", "P4"])
+    p3.setup_topology(incoming=["P1", "P2", "P4"], outgoing=["P1", "P2", "P4"])
+    p4.setup_topology(incoming=["P1", "P2", "P3"], outgoing=["P1", "P2", "P3"])
 
     # Helper pour planifier
     def schedule_send(time, src_proc, target_pid, content):
@@ -51,6 +54,8 @@ def run_simulation():
     # P1 recevra le marqueur de retour de P2 seulement vers T=16 (approx).
     # Donc ce message sera CAPTURÉ (c21).
     schedule_send(8, p2, "P1", "Msg G->D")
+
+    schedule_send(15, p1, "P4", "Msg K->L")
 
     # === ÉTAPE 4 : Trafic Post-Snapshot ===
     # Correspond au message E -> J (P1 vers P3) sur votre image (droite du schéma)
