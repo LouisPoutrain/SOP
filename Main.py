@@ -1,7 +1,7 @@
 # main.py
 from simulator import Simulator
 from process import Process 
-from chema import ExecutionPlotter
+from schema import ExecutionPlotter
 
 def run_simulation():
     # 1. Initialisation
