@@ -1,4 +1,14 @@
 \babel@toc {french}{}\relax 
 \contentsline {section}{\numberline {1}Introduction}{2}{}%
-\contentsline {section}{\numberline {2}Choix du design}{2}{}%
-\contentsline {section}{\numberline {3}Exemple Consistant}{2}{}%
+\contentsline {section}{\numberline {2}Architecture et Implémentation}{2}{}%
+\contentsline {subsection}{\numberline {2.1}Composants}{2}{}%
+\contentsline {subsection}{\numberline {2.2}Algorithme}{2}{}%
+\contentsline {section}{\numberline {3}Exemple Consistant}{3}{}%
+\contentsline {subsection}{\numberline {3.1}Description}{3}{}%
+\contentsline {subsection}{\numberline {3.2}Scénario}{3}{}%
+\contentsline {section}{\numberline {4}Interfaces et Résultats}{4}{}%
+\contentsline {subsection}{\numberline {4.1}Interface Formulaire (ui.py)}{4}{}%
+\contentsline {subsection}{\numberline {4.2}Interface Graphique (ui\_graphical.py)}{4}{}%
+\contentsline {subsection}{\numberline {4.3}État Global Capturé}{4}{}%
+\contentsline {subsection}{\numberline {4.4}Exemple de Résultat}{4}{}%
+\contentsline {section}{\numberline {5}Conclusion}{4}{}%
