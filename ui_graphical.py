@@ -11,8 +11,12 @@ class GraphicalSimulationUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("SOP - Simulation Snapshot (Graphique)")
-        self.geometry("1100x700")
-
+        # Maximize window at startup (cross-platform)
+        try:
+            self.state('zoomed')  # Works on Windows and macOS
+        except:
+            self.geometry("1400x900")  # Fallback for other systems
+        
         self.events = []
         self.event_counter = 0
         self.show_plot_var = tk.BooleanVar(value=True)
@@ -92,8 +96,8 @@ class GraphicalSimulationUI(tk.Tk):
         events_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         columns = ("time", "type", "src", "dst", "content")
-        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=12)
-        for col, width in zip(columns, (70, 90, 70, 70, 180)):
+        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=8)
+        for col, width in zip(columns, (60, 80, 60, 60, 150)):
             self.events_tree.heading(col, text=col.capitalize())
             self.events_tree.column(col, width=width, anchor=tk.CENTER if col != "content" else tk.W)
         self.events_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -105,15 +109,15 @@ class GraphicalSimulationUI(tk.Tk):
 
         # Events log (real-time display)
         log_frame = ttk.LabelFrame(right, text="Journal des événements")
-        log_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
-        self.events_log = tk.Text(log_frame, height=6, wrap=tk.WORD, font=("Helvetica", 10))
-        self.events_log.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        log_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=3)
+        self.events_log = tk.Text(log_frame, height=4, wrap=tk.WORD, font=("Helvetica", 9))
+        self.events_log.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
         # Process states (real-time display)
         states_frame = ttk.LabelFrame(right, text="États des Processus")
-        states_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        self.states_text = tk.Text(states_frame, height=10, wrap=tk.WORD, font=("Helvetica", 9))
-        self.states_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        states_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
+        self.states_text = tk.Text(states_frame, height=8, wrap=tk.WORD, font=("Helvetica", 8))
+        self.states_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
         # Run section
         run_frame = ttk.Frame(container)
@@ -124,9 +128,9 @@ class GraphicalSimulationUI(tk.Tk):
 
         # Output
         output_frame = ttk.LabelFrame(container, text="Résultats")
-        output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        self.output_text = tk.Text(output_frame, height=8, wrap=tk.WORD)
-        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
+        self.output_text = tk.Text(output_frame, height=6, wrap=tk.WORD, font=("Helvetica", 9))
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
     def _parse_process_ids(self):
         raw = self.process_ids_entry.get().strip()
