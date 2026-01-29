@@ -1,0 +1,49 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel} 
+\usepackage{graphicx}
+
+\title{Lab 1 - Global States and Distributed Snapshots}
+
+\author{
+  Ruben Mbiyavanga \and
+  Nassir Naibi \and
+  Louis Poutrain \and
+  Gregory Dubouloy
+}
+
+
+\date{\today}
+
+\begin{document}
+
+\maketitle 
+
+\tableofcontents 
+
+\newpage
+
+\section{Introduction}
+\section{Choix du design}
+Nous avons divisé notre code en plusieurs classes.
+\begin{itemize}
+    \item Process
+    \item Event
+    \item Simulator
+    \item Message
+\end{itemize}
+\section{Exemple Consistant}
+
+
+Notre exemple est consitant car dans la coupure réalisée, toute conséquence a une causalité
+
+\begin{figure}[htbp] % [htbp] aide à placer l'image au bon endroit
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/Capture_decran_2026-01-27_a_15.45.00.png} % Nom simple sans espaces
+    \caption{Schéma d'exécution}
+    \label{fig:meta}
+\end{figure}
+
+
+\end{document}

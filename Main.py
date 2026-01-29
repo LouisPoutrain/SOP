@@ -1,7 +1,10 @@
 # main.py
+import sys
+
 from simulator import Simulator
 from process import Process 
 from schema import ExecutionPlotter
+from ui import SimulationUI
 
 def run_simulation():
     # 1. Initialisation
@@ -85,8 +88,12 @@ def run_simulation():
     return sim
 
 if __name__ == "__main__":
-    sim = run_simulation()
-    
-    print("\nGénération du graphique...")
-    plotter = ExecutionPlotter(sim)
-    plotter.plot()
+    if "--cli" in sys.argv:
+        sim = run_simulation()
+
+        print("\nGénération du graphique...")
+        plotter = ExecutionPlotter(sim)
+        plotter.plot()
+    else:
+        app = SimulationUI()
+        app.mainloop()

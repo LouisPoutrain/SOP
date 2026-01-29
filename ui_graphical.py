@@ -1,0 +1,344 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from functools import partial
+
+from simulator import Simulator
+from process import Process
+from schema import ExecutionPlotter
+
+
+class GraphicalSimulationUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("SOP - Simulation Snapshot (Graphique)")
+        self.geometry("1100x700")
+
+        self.events = []
+        self.event_counter = 0
+        self.show_plot_var = tk.BooleanVar(value=True)
+        self.mode_var = tk.StringVar(value="message")
+        self.pending_message = None
+
+        self.time_scale = 12  # pixels per time unit
+        self.top_margin = 60
+        self.left_margin = 60
+        self.max_time = 40
+        self.delay = 5
+
+        self._build_ui()
+        self._draw_canvas()
+
+    def _build_ui(self):
+        container = ttk.Frame(self, padding=10)
+        container.pack(fill=tk.BOTH, expand=True)
+
+        # Top controls
+        top = ttk.Frame(container)
+        top.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(top, text="Processus (ex: P1,P2,P3)").pack(side=tk.LEFT)
+        self.process_ids_entry = ttk.Entry(top, width=30)
+        self.process_ids_entry.insert(0, "P1,P2,P3")
+        self.process_ids_entry.pack(side=tk.LEFT, padx=5)
+
+        ttk.Label(top, text="Temps max").pack(side=tk.LEFT, padx=(10, 0))
+        self.max_time_entry = ttk.Entry(top, width=6)
+        self.max_time_entry.insert(0, str(self.max_time))
+        self.max_time_entry.pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(top, text="Mettre à jour", command=self._update_diagram).pack(side=tk.LEFT, padx=5)
+
+        # Middle layout
+        middle = ttk.Frame(container)
+        middle.pack(fill=tk.BOTH, expand=True)
+
+        left = ttk.Frame(middle)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        right = ttk.Frame(middle)
+        right.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Canvas
+        canvas_frame = ttk.LabelFrame(left, text="Insertion graphique")
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        self.canvas = tk.Canvas(canvas_frame, bg="white")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.canvas.bind("<Button-1>", self._on_canvas_click)
+
+        # Mode + content
+        mode_frame = ttk.LabelFrame(right, text="Mode")
+        mode_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Radiobutton(mode_frame, text="Message", value="message", variable=self.mode_var).pack(anchor=tk.W)
+        ttk.Radiobutton(mode_frame, text="Snapshot", value="snapshot", variable=self.mode_var).pack(anchor=tk.W)
+
+        content_frame = ttk.LabelFrame(right, text="Contenu du message")
+        content_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.msg_content_entry = ttk.Entry(content_frame, width=25)
+        self.msg_content_entry.insert(0, "Msg")
+        self.msg_content_entry.pack(padx=5, pady=5)
+
+        # Events list
+        events_frame = ttk.LabelFrame(right, text="Événements")
+        events_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        columns = ("time", "type", "src", "dst", "content")
+        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=12)
+        for col, width in zip(columns, (70, 90, 70, 70, 180)):
+            self.events_tree.heading(col, text=col.capitalize())
+            self.events_tree.column(col, width=width, anchor=tk.CENTER if col != "content" else tk.W)
+        self.events_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        buttons_frame = ttk.Frame(events_frame)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Supprimer sélection", command=self._remove_selected).pack(side=tk.LEFT)
+        ttk.Button(buttons_frame, text="Vider la liste", command=self._clear_events).pack(side=tk.LEFT, padx=5)
+
+        # Run section
+        run_frame = ttk.Frame(container)
+        run_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Checkbutton(run_frame, text="Afficher le graphique", variable=self.show_plot_var).pack(side=tk.LEFT)
+        ttk.Button(run_frame, text="Lancer la simulation", command=self._run_simulation).pack(side=tk.RIGHT)
+
+        # Output
+        output_frame = ttk.LabelFrame(container, text="Résultats")
+        output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.output_text = tk.Text(output_frame, height=8, wrap=tk.WORD)
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+    def _parse_process_ids(self):
+        raw = self.process_ids_entry.get().strip()
+        if not raw:
+            raise ValueError("Veuillez saisir au moins un ID de processus.")
+        parts = [p.strip() for p in raw.replace(";", ",").replace(" ", ",").split(",")]
+        pids = [p for p in parts if p]
+        if len(pids) < 2:
+            raise ValueError("Au moins 2 processus sont nécessaires.")
+        seen = set()
+        unique = []
+        for pid in pids:
+            if pid not in seen:
+                unique.append(pid)
+                seen.add(pid)
+        return unique
+
+    def _update_diagram(self):
+        try:
+            self.max_time = float(self.max_time_entry.get())
+            if self.max_time <= 0:
+                raise ValueError
+            self._draw_canvas()
+        except ValueError:
+            messagebox.showerror("Erreur", "Temps max invalide.")
+
+    def _draw_canvas(self):
+        self.canvas.delete("all")
+        pids = self._parse_process_ids()
+        self.y_map = {}
+
+        width = max(int(self.left_margin + self.max_time * self.time_scale + 40), 700)
+        height = max(self.canvas.winfo_height(), 400)
+        self.canvas.config(scrollregion=(0, 0, width, height))
+
+        # Grid/time labels (vertical grid lines at bottom)
+        for t in range(0, int(self.max_time) + 1, 5):
+            x = self.left_margin + t * self.time_scale
+            self.canvas.create_line(x, self.top_margin - 10, x, height - 20, fill="#efefef")
+            self.canvas.create_text(x, height - 5, text=str(t), anchor=tk.N, fill="#999")
+
+        # Lifelines (horizontal lines for each process)
+        spacing = (height - self.top_margin - 40) / max(1, len(pids) - 1) if len(pids) > 1 else height - self.top_margin - 40
+        for idx, pid in enumerate(pids):
+            y = self.top_margin + idx * spacing
+            self.y_map[pid] = y
+            self.canvas.create_text(15, y, text=pid, font=("Helvetica", 11, "bold"), anchor=tk.E)
+            self.canvas.create_line(self.left_margin, y, self.left_margin + self.max_time * self.time_scale, y,
+                                    fill="black")
+
+        # Redraw existing events
+        for event in self.events:
+            if event["type"] == "MESSAGE":
+                self._draw_message(event)
+            elif event["type"] == "SNAPSHOT":
+                self._draw_snapshot(event)
+
+    def _nearest_process(self, x):
+        pid = min(self.y_map.keys(), key=lambda p: abs(self.y_map[p] - x))
+        return pid
+
+    def _time_from_y(self, y):
+        t = (y - self.left_margin) / self.time_scale
+        if t < 0:
+            t = 0
+        return round(t, 1)
+
+    def _on_canvas_click(self, event):
+        try:
+            pids = self._parse_process_ids()
+            if not pids:
+                return
+            pid = self._nearest_process(event.y)
+            time_val = self._time_from_y(event.x)
+
+            if self.mode_var.get() == "snapshot":
+                self._add_event({
+                    "time": time_val,
+                    "type": "SNAPSHOT",
+                    "pid": pid,
+                    "src": pid,
+                    "dst": "-",
+                    "content": "-",
+                })
+                self._draw_snapshot(self.events[-1])
+                return
+
+            # Message mode
+            if self.pending_message is None:
+                self.pending_message = {"src": pid, "time": time_val}
+                self.canvas.delete("pending")
+                x = self.left_margin + time_val * self.time_scale
+                self.canvas.create_oval(x - 4, self.y_map[pid] - 4, x + 4, self.y_map[pid] + 4,
+                                        fill="orange", outline="", tags="pending")
+            else:
+                src = self.pending_message["src"]
+                time_val = self.pending_message["time"]
+                dst = pid
+                content = self.msg_content_entry.get().strip() or "Msg"
+                self.pending_message = None
+                self.canvas.delete("pending")
+
+                if src == dst:
+                    messagebox.showerror("Erreur", "Source et destination doivent être différentes.")
+                    return
+
+                self._add_event({
+                    "time": time_val,
+                    "type": "MESSAGE",
+                    "src": src,
+                    "dst": dst,
+                    "content": content,
+                })
+                self._draw_message(self.events[-1])
+
+        except ValueError as exc:
+            messagebox.showerror("Erreur", str(exc))
+
+    def _draw_message(self, event):
+        src = event["src"]
+        dst = event["dst"]
+        t_send = event["time"]
+        t_rcv = t_send + self.delay
+
+        x1 = self.left_margin + t_send * self.time_scale
+        x2 = self.left_margin + t_rcv * self.time_scale
+        y1 = self.y_map[src]
+        y2 = self.y_map[dst]
+
+        self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill="#1f77b4", width=2)
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        self.canvas.create_text(mid_x, mid_y - 8, text=event["content"], fill="#1f77b4", font=("Helvetica", 9))
+
+    def _draw_snapshot(self, event):
+        pid = event["pid"]
+        t = event["time"]
+        x = self.left_margin + t * self.time_scale
+        y = self.y_map[pid]
+        self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="red", outline="")
+        self.canvas.create_text(x, y - 12, text=f"S_{pid}", fill="red", anchor=tk.S)
+
+    def _add_event(self, event):
+        self.event_counter += 1
+        event_id = f"evt-{self.event_counter}"
+        event["id"] = event_id
+        self.events.append(event)
+        self.events_tree.insert("", tk.END, iid=event_id, values=(
+            event.get("time"),
+            event.get("type"),
+            event.get("src", ""),
+            event.get("dst", ""),
+            event.get("content", "")
+        ))
+
+    def _remove_selected(self):
+        selection = self.events_tree.selection()
+        if not selection:
+            return
+        for item in selection:
+            self.events_tree.delete(item)
+            self.events = [e for e in self.events if e.get("id") != item]
+        self._draw_canvas()
+
+    def _clear_events(self):
+        for item in self.events_tree.get_children():
+            self.events_tree.delete(item)
+        self.events = []
+        self._draw_canvas()
+
+    def _run_simulation(self):
+        try:
+            pids = self._parse_process_ids()
+            if not self.events:
+                raise ValueError("Ajoutez au moins un événement.")
+
+            sim = Simulator()
+            processes = {}
+            for pid in pids:
+                proc = Process(pid, sim)
+                processes[pid] = proc
+                sim.register_process(proc)
+
+            # Topologie mesh (tous connectés)
+            for pid, proc in processes.items():
+                incoming = [p for p in pids if p != pid]
+                outgoing = [p for p in pids if p != pid]
+                proc.setup_topology(incoming=incoming, outgoing=outgoing)
+
+            # Planification des événements
+            for event in sorted(self.events, key=lambda e: e["time"]):
+                time_val = event["time"]
+                if event["type"] == "MESSAGE":
+                    src = processes[event["src"]]
+                    dst = event["dst"]
+                    content = event["content"]
+                    action = partial(src.send_message, dst, content)
+                    sim.schedule(time_val, src, action)
+                elif event["type"] == "SNAPSHOT":
+                    proc = processes[event["pid"]]
+                    sim.schedule(time_val, proc, proc.initiate_snapshot)
+
+            # Exécution
+            sim.run()
+
+            # Résultats
+            self.output_text.delete("1.0", tk.END)
+            self.output_text.insert(tk.END, "=" * 40 + "\n")
+            self.output_text.insert(tk.END, "RÉSULTATS DU SNAPSHOT GLOBAL\n")
+            self.output_text.insert(tk.END, "=" * 40 + "\n")
+            for pid in pids:
+                proc = processes[pid]
+                self.output_text.insert(tk.END, f"\nProcessus {pid}:\n")
+                self.output_text.insert(tk.END, f"  > État Local capturé : {proc.snapshot_local_state}\n")
+                self.output_text.insert(tk.END, "  > État des canaux entrants :\n")
+                if not proc.channel_states:
+                    self.output_text.insert(tk.END, "    (Aucun message capturé)\n")
+                else:
+                    for neighbor, msgs in proc.channel_states.items():
+                        if msgs:
+                            self.output_text.insert(tk.END, f"    From {neighbor}: {msgs}\n")
+                        else:
+                            self.output_text.insert(tk.END, f"    From {neighbor}: <Vide>\n")
+
+            if self.show_plot_var.get():
+                plotter = ExecutionPlotter(sim)
+                plotter.plot()
+
+        except ValueError as exc:
+            messagebox.showerror("Erreur", str(exc))
+
+
+if __name__ == "__main__":
+    app = GraphicalSimulationUI()
+    app.mainloop()
