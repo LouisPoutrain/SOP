@@ -36,34 +36,7 @@ class GraphicalSimulationUI(tk.Tk):
         self._draw_canvas()
 
     def _build_ui(self):
-        # Main scrollable container
-        main_canvas = tk.Canvas(self, bg="white", highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=main_canvas.yview)
-        scrollable_frame = ttk.Frame(main_canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
-        )
-        
-        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        main_canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack the scrollable interface
-        main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Bind mouse wheel to canvas
-        main_canvas.bind("<MouseWheel>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        main_canvas.bind("<Button-4>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        main_canvas.bind("<Button-5>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        
-        # Also bind to scrollable_frame for better event capture
-        scrollable_frame.bind("<MouseWheel>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        scrollable_frame.bind("<Button-4>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        scrollable_frame.bind("<Button-5>", lambda e: self._on_main_mousewheel(e, main_canvas))
-        
-        container = ttk.Frame(scrollable_frame, padding=10)
+        container = ttk.Frame(self, padding=10)
         container.pack(fill=tk.BOTH, expand=True)
 
         # Top controls
@@ -82,106 +55,73 @@ class GraphicalSimulationUI(tk.Tk):
 
         ttk.Button(top, text="Mettre à jour", command=self._update_diagram).pack(side=tk.LEFT, padx=5)
 
-        # Middle layout with resizable panes
-        middle = ttk.PanedWindow(container, orient=tk.HORIZONTAL)
+        # Middle layout
+        middle = ttk.Frame(container)
         middle.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # LEFT PANE - Canvas with scrollbars
+        # LEFT - Canvas
         left = ttk.Frame(middle)
-        middle.add(left, weight=3)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         canvas_frame = ttk.LabelFrame(left, text="Insertion graphique")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Create a frame for canvas + scrollbars
-        canvas_container = ttk.Frame(canvas_frame)
-        canvas_container.pack(fill=tk.BOTH, expand=True)
-
-        # Horizontal scrollbar
-        h_scrollbar = ttk.Scrollbar(canvas_container, orient=tk.HORIZONTAL)
-        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
-
-        # Vertical scrollbar
-        v_scrollbar = ttk.Scrollbar(canvas_container, orient=tk.VERTICAL)
-        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Canvas
-        self.canvas = tk.Canvas(canvas_container, bg="white", xscrollcommand=h_scrollbar.set, 
-                               yscrollcommand=v_scrollbar.set)
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Configure scrollbars to scroll canvas
-        h_scrollbar.config(command=self.canvas.xview)
-        v_scrollbar.config(command=self.canvas.yview)
-
+        self.canvas = tk.Canvas(canvas_frame, bg="white", height=400)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<Button-1>", self._on_canvas_click)
-        # Allow mouse wheel scrolling
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind("<Button-4>", self._on_mousewheel)  # Linux scroll up
-        self.canvas.bind("<Button-5>", self._on_mousewheel)  # Linux scroll down
 
-        # RIGHT PANE - Vertical stack of control panels
+        # RIGHT - Controls and info
         right = ttk.Frame(middle)
-        middle.add(right, weight=1)
+        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(5, 0))
 
-        # Mode + content
+        # Mode
         mode_frame = ttk.LabelFrame(right, text="Mode")
-        mode_frame.pack(fill=tk.X, padx=0, pady=5)
-
+        mode_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Radiobutton(mode_frame, text="Message", value="message", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=2)
         ttk.Radiobutton(mode_frame, text="Snapshot", value="snapshot", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=2)
 
+        # Message content
         content_frame = ttk.LabelFrame(right, text="Contenu du message")
-        content_frame.pack(fill=tk.X, padx=0, pady=5)
-        self.msg_content_entry = ttk.Entry(content_frame)
+        content_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.msg_content_entry = ttk.Entry(content_frame, width=25)
         self.msg_content_entry.insert(0, "Msg")
-        self.msg_content_entry.pack(fill=tk.X, padx=5, pady=5)
+        self.msg_content_entry.pack(padx=5, pady=5)
         
-        # Message status label
         self.msg_status = ttk.Label(content_frame, text="Cliquez sur source puis destination", 
-                                     font=("Helvetica", 8, "italic"), foreground="gray")
+                                     font=("Helvetica", 9, "italic"), foreground="gray")
         self.msg_status.pack(padx=5, pady=2)
 
-        # Events list with resizable inner panes
-        right_paned = ttk.PanedWindow(right, orient=tk.VERTICAL)
-        right_paned.pack(fill=tk.BOTH, expand=True, padx=0, pady=5)
-
-        events_frame = ttk.LabelFrame(right_paned, text="Événements")
-        right_paned.add(events_frame, weight=2)
+        # Events list
+        events_frame = ttk.LabelFrame(right, text="Événements")
+        events_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         columns = ("time", "type", "src", "dst", "content")
-        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings")
-        self.events_tree.heading("time", text="Temps")
-        self.events_tree.heading("type", text="Type")
-        self.events_tree.heading("src", text="Src")
-        self.events_tree.heading("dst", text="Dst")
-        self.events_tree.heading("content", text="Contenu")
-        # Use stretch=True for responsive columns
-        for col in columns:
-            self.events_tree.column(col, stretch=True, anchor=tk.CENTER if col != "content" else tk.W)
+        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=8)
+        for col, width in zip(columns, (60, 80, 60, 60, 80)):
+            self.events_tree.heading(col, text=col.capitalize())
+            self.events_tree.column(col, width=width, anchor=tk.CENTER if col != "content" else tk.W)
         self.events_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         buttons_frame = ttk.Frame(events_frame)
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Supprimer", command=self._remove_selected).pack(side=tk.LEFT, padx=2)
-        ttk.Button(buttons_frame, text="Vider", command=self._clear_events).pack(side=tk.LEFT, padx=2)
+        ttk.Button(buttons_frame, text="Supprimer sélection", command=self._remove_selected).pack(side=tk.LEFT)
+        ttk.Button(buttons_frame, text="Vider la liste", command=self._clear_events).pack(side=tk.LEFT, padx=5)
 
-        # Events log (real-time display)
-        log_frame = ttk.LabelFrame(right_paned, text="Journal des événements")
-        right_paned.add(log_frame, weight=1)
-        self.events_log = tk.Text(log_frame, wrap=tk.WORD, font=("Helvetica", 8))
+        # Events log
+        log_frame = ttk.LabelFrame(right, text="Journal des événements")
+        log_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+        self.events_log = tk.Text(log_frame, height=4, wrap=tk.WORD, font=("Helvetica", 9))
         self.events_log.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
-        # Process states (real-time display)
-        states_frame = ttk.LabelFrame(right_paned, text="États des Processus")
-        right_paned.add(states_frame, weight=1)
-        self.states_text = tk.Text(states_frame, wrap=tk.WORD, font=("Helvetica", 7))
+        # Process states
+        states_frame = ttk.LabelFrame(right, text="États des Processus")
+        states_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+        self.states_text = tk.Text(states_frame, height=6, wrap=tk.WORD, font=("Helvetica", 9))
         self.states_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
 
         # Run section
         run_frame = ttk.Frame(container)
         run_frame.pack(fill=tk.X, padx=5, pady=5)
-
         ttk.Checkbutton(run_frame, text="Afficher le graphique", variable=self.show_plot_var).pack(side=tk.LEFT)
         ttk.Button(run_frame, text="Lancer la simulation", command=self._run_simulation).pack(side=tk.RIGHT)
 
@@ -189,23 +129,7 @@ class GraphicalSimulationUI(tk.Tk):
         output_frame = ttk.LabelFrame(container, text="Résultats")
         output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
         self.output_text = tk.Text(output_frame, height=6, wrap=tk.WORD, font=("Helvetica", 9))
-        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)        
-        # Bind scroll wheel to all widgets recursively
-        self._bind_mousewheel_recursive(container, main_canvas)
-
-    def _bind_mousewheel_recursive(self, widget, main_canvas):
-        """Recursively bind mousewheel events to widget and all children"""
-        # Bind to current widget
-        widget.bind("<MouseWheel>", lambda e: self._on_main_mousewheel(e, main_canvas), add=True)
-        widget.bind("<Button-4>", lambda e: self._on_main_mousewheel(e, main_canvas), add=True)
-        widget.bind("<Button-5>", lambda e: self._on_main_mousewheel(e, main_canvas), add=True)
-        
-        # Recursively bind to all children
-        try:
-            for child in widget.winfo_children():
-                self._bind_mousewheel_recursive(child, main_canvas)
-        except:
-            pass
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
     def _parse_process_ids(self):
         raw = self.process_ids_entry.get().strip()
         if not raw:
@@ -327,53 +251,6 @@ class GraphicalSimulationUI(tk.Tk):
 
         except ValueError as exc:
             messagebox.showerror("Erreur", str(exc))
-
-    def _on_mousewheel(self, event):
-        """Handle mouse wheel scrolling on diagram canvas (macOS trackpad + wheel mice)"""
-        # Determine scroll direction - macOS trackpad uses event.delta
-        try:
-            delta = event.delta if hasattr(event, 'delta') else 0
-            num = event.num if hasattr(event, 'num') else 0
-            
-            if delta != 0:
-                direction = 1 if delta < 0 else -1
-            elif num == 5:
-                direction = 1
-            elif num == 4:
-                direction = -1
-            else:
-                return
-            
-            # Scroll canvas
-            if event.state & 0x1:  # Shift key - horizontal scroll
-                self.canvas.xview_scroll(direction * 3, tk.UNITS)
-            else:  # Vertical scroll
-                self.canvas.yview_scroll(direction * 3, tk.UNITS)
-        except:
-            pass
-        return "break"
-    
-    def _on_main_mousewheel(self, event, canvas):
-        """Handle mouse wheel scrolling on main interface canvas (macOS trackpad + wheel mice)"""
-        # Determine scroll direction - macOS trackpad uses event.delta
-        try:
-            delta = event.delta if hasattr(event, 'delta') else 0
-            num = event.num if hasattr(event, 'num') else 0
-            
-            if delta != 0:
-                direction = 1 if delta < 0 else -1
-            elif num == 5:
-                direction = 1
-            elif num == 4:
-                direction = -1
-            else:
-                return
-            
-            # Scroll main canvas
-            canvas.yview_scroll(direction * 3, tk.UNITS)
-        except:
-            pass
-        return "break"
 
     def _draw_message(self, event):
         src = event["src"]
