@@ -36,99 +36,117 @@ class GraphicalSimulationUI(tk.Tk):
         self._draw_canvas()
 
     def _build_ui(self):
-        container = ttk.Frame(self, padding=10)
-        container.pack(fill=tk.BOTH, expand=True)
+        # Configure window grid weights for responsive layout
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        
+        # Main container with grid
+        container = ttk.Frame(self)
+        container.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        container.columnconfigure(0, weight=1)
+        container.rowconfigure(0, weight=0)  # Top controls - fixed
+        container.rowconfigure(1, weight=8)  # Middle - main area (increased)
+        container.rowconfigure(2, weight=0)  # Run button - fixed
+        container.rowconfigure(3, weight=1)  # Results - minimal
 
         # Top controls
         top = ttk.Frame(container)
-        top.pack(fill=tk.X, padx=5, pady=5)
+        top.grid(row=0, column=0, sticky="ew", pady=5)
+        top.columnconfigure(1, weight=1)
 
-        ttk.Label(top, text="Processus (ex: P1,P2,P3)").pack(side=tk.LEFT)
+        ttk.Label(top, text="Processus (ex: P1,P2,P3)").grid(row=0, column=0, sticky="w", padx=5)
         self.process_ids_entry = ttk.Entry(top, width=30)
         self.process_ids_entry.insert(0, "P1,P2,P3")
-        self.process_ids_entry.pack(side=tk.LEFT, padx=5)
+        self.process_ids_entry.grid(row=0, column=1, sticky="ew", padx=5)
 
-        ttk.Label(top, text="Temps max").pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(top, text="Temps max").grid(row=0, column=2, sticky="w", padx=(10, 0))
         self.max_time_entry = ttk.Entry(top, width=6)
         self.max_time_entry.insert(0, str(self.max_time))
-        self.max_time_entry.pack(side=tk.LEFT, padx=5)
+        self.max_time_entry.grid(row=0, column=3, sticky="w", padx=5)
 
-        ttk.Button(top, text="Mettre à jour", command=self._update_diagram).pack(side=tk.LEFT, padx=5)
+        ttk.Button(top, text="Mettre à jour", command=self._update_diagram).grid(row=0, column=4, sticky="w", padx=5)
 
-        # Middle layout
-        middle = ttk.Frame(container)
-        middle.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Middle layout with PanedWindow
+        middle = ttk.PanedWindow(container, orient=tk.HORIZONTAL)
+        middle.grid(row=1, column=0, sticky="nsew", pady=5)
 
         # LEFT - Canvas
         left = ttk.Frame(middle)
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        middle.add(left, weight=3)
 
         canvas_frame = ttk.LabelFrame(left, text="Insertion graphique")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, bg="white", height=400)
+        self.canvas = tk.Canvas(canvas_frame, bg="white")
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<Button-1>", self._on_canvas_click)
 
-        # RIGHT - Controls and info
+        # RIGHT - Controls and info (compact paned)
         right = ttk.Frame(middle)
-        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(5, 0))
+        middle.add(right, weight=1)
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(0, weight=0)  # Mode
+        right.rowconfigure(1, weight=0)  # Content
+        right.rowconfigure(2, weight=2)  # Events tree
+        right.rowconfigure(3, weight=1)  # Log
+        right.rowconfigure(4, weight=1)  # States
 
         # Mode
         mode_frame = ttk.LabelFrame(right, text="Mode")
-        mode_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Radiobutton(mode_frame, text="Message", value="message", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=2)
-        ttk.Radiobutton(mode_frame, text="Snapshot", value="snapshot", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=2)
+        mode_frame.grid(row=0, column=0, sticky="ew", padx=3, pady=2)
+        ttk.Radiobutton(mode_frame, text="Message", value="message", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=1)
+        ttk.Radiobutton(mode_frame, text="Snapshot", value="snapshot", variable=self.mode_var).pack(anchor=tk.W, padx=5, pady=1)
 
         # Message content
         content_frame = ttk.LabelFrame(right, text="Contenu du message")
-        content_frame.pack(fill=tk.X, padx=5, pady=5)
+        content_frame.grid(row=1, column=0, sticky="ew", padx=3, pady=2)
         self.msg_content_entry = ttk.Entry(content_frame, width=25)
         self.msg_content_entry.insert(0, "Msg")
-        self.msg_content_entry.pack(padx=5, pady=5)
+        self.msg_content_entry.pack(padx=5, pady=2)
         
         self.msg_status = ttk.Label(content_frame, text="Cliquez sur source puis destination", 
-                                     font=("Helvetica", 9, "italic"), foreground="gray")
-        self.msg_status.pack(padx=5, pady=2)
+                                     font=("Helvetica", 8, "italic"), foreground="gray")
+        self.msg_status.pack(padx=5, pady=1)
 
         # Events list
         events_frame = ttk.LabelFrame(right, text="Événements")
-        events_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        events_frame.grid(row=2, column=0, sticky="nsew", padx=3, pady=2)
 
         columns = ("time", "type", "src", "dst", "content")
-        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=8)
-        for col, width in zip(columns, (60, 80, 60, 60, 80)):
+        self.events_tree = ttk.Treeview(events_frame, columns=columns, show="headings", height=4)
+        for col, width in zip(columns, (50, 60, 50, 50, 60)):
             self.events_tree.heading(col, text=col.capitalize())
             self.events_tree.column(col, width=width, anchor=tk.CENTER if col != "content" else tk.W)
-        self.events_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.events_tree.pack(fill=tk.BOTH, expand=True, padx=3, pady=2)
 
         buttons_frame = ttk.Frame(events_frame)
-        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Supprimer sélection", command=self._remove_selected).pack(side=tk.LEFT)
-        ttk.Button(buttons_frame, text="Vider la liste", command=self._clear_events).pack(side=tk.LEFT, padx=5)
+        buttons_frame.pack(fill=tk.X, padx=3, pady=2)
+        ttk.Button(buttons_frame, text="Suppr.", command=self._remove_selected).pack(side=tk.LEFT, padx=1)
+        ttk.Button(buttons_frame, text="Vider", command=self._clear_events).pack(side=tk.LEFT, padx=1)
 
         # Events log
-        log_frame = ttk.LabelFrame(right, text="Journal des événements")
-        log_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
-        self.events_log = tk.Text(log_frame, height=4, wrap=tk.WORD, font=("Helvetica", 9))
-        self.events_log.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
+        log_frame = ttk.LabelFrame(right, text="Journal")
+        log_frame.grid(row=3, column=0, sticky="nsew", padx=3, pady=2)
+        self.events_log = tk.Text(log_frame, height=4, wrap=tk.WORD, font=("Helvetica", 8))
+        self.events_log.pack(fill=tk.BOTH, expand=True, padx=3, pady=2)
 
         # Process states
-        states_frame = ttk.LabelFrame(right, text="États des Processus")
-        states_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
-        self.states_text = tk.Text(states_frame, height=6, wrap=tk.WORD, font=("Helvetica", 9))
-        self.states_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
+        states_frame = ttk.LabelFrame(right, text="États")
+        states_frame.grid(row=4, column=0, sticky="nsew", padx=3, pady=2)
+        self.states_text = tk.Text(states_frame, height=4, wrap=tk.WORD, font=("Helvetica", 7))
+        self.states_text.pack(fill=tk.BOTH, expand=True, padx=3, pady=2)
 
         # Run section
         run_frame = ttk.Frame(container)
-        run_frame.pack(fill=tk.X, padx=5, pady=5)
+        run_frame.grid(row=2, column=0, sticky="ew", pady=3)
         ttk.Checkbutton(run_frame, text="Afficher le graphique", variable=self.show_plot_var).pack(side=tk.LEFT)
         ttk.Button(run_frame, text="Lancer la simulation", command=self._run_simulation).pack(side=tk.RIGHT)
 
-        # Output
-        output_frame = ttk.LabelFrame(container, text="Résultats")
-        output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
-        self.output_text = tk.Text(output_frame, height=6, wrap=tk.WORD, font=("Helvetica", 9))
+        # Output (hidden by default)
+        self.output_frame = ttk.LabelFrame(container, text="Résultats")
+        self.output_frame.grid(row=3, column=0, sticky="nsew", pady=3)
+        self.output_frame.grid_remove()  # Hide initially
+        self.output_text = tk.Text(self.output_frame, wrap=tk.WORD, font=("Helvetica", 8))
         self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
     def _parse_process_ids(self):
         raw = self.process_ids_entry.get().strip()
@@ -160,26 +178,72 @@ class GraphicalSimulationUI(tk.Tk):
         pids = self._parse_process_ids()
         self.y_map = {}
 
-        width = max(int(self.left_margin + self.max_time * self.time_scale + 40), 700)
-        height = max(self.canvas.winfo_height(), 400)
-        self.canvas.config(scrollregion=(0, 0, width, height))
+        # Get actual canvas size
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # Fallback if canvas not yet drawn
+        if canvas_width <= 1:
+            canvas_width = 800
+        if canvas_height <= 1:
+            canvas_height = 300
 
-        # Grid/time labels (vertical grid lines at bottom)
+        num_processes = len(pids)
+
+        # Calculate dynamic spacing to fit all processes
+        # Leave margins for time labels and labels
+        available_height = canvas_height - self.top_margin - 50
+        
+        # Minimum 40px per process, scale down if needed
+        ideal_spacing = available_height / max(1, num_processes - 1) if num_processes > 1 else available_height
+        spacing = min(ideal_spacing, available_height / max(1, num_processes - 1)) if num_processes > 1 else available_height
+        spacing = max(spacing, 30)  # Absolute minimum spacing
+        
+        # Recalculate top_margin if spacing gets too compressed
+        if num_processes > 1 and spacing * (num_processes - 1) > available_height:
+            spacing = available_height / max(1, num_processes - 1)
+
+        # Calculate time scale to fit width
+        available_width = canvas_width - self.left_margin - 60
+        time_scale = available_width / self.max_time if self.max_time > 0 else 10
+        self.time_scale = max(int(time_scale), 3)  # Minimum 3 pixels per time unit
+
+        # Determine font size based on number of processes
+        if num_processes <= 3:
+            pid_font_size = 10
+            time_font_size = 8
+        elif num_processes <= 5:
+            pid_font_size = 9
+            time_font_size = 7
+        else:
+            pid_font_size = 8
+            time_font_size = 6
+
+        # Grid/time labels
         for t in range(0, int(self.max_time) + 1, 5):
             x = self.left_margin + t * self.time_scale
-            self.canvas.create_line(x, self.top_margin - 10, x, height - 20, fill="#efefef")
-            self.canvas.create_text(x, height - 5, text=str(t), anchor=tk.N, fill="#999")
+            if x < canvas_width - 20:
+                self.canvas.create_line(x, self.top_margin - 10, x, canvas_height - 30, fill="#efefef", width=1)
+                self.canvas.create_text(x, canvas_height - 10, text=str(t), anchor=tk.N, fill="#999", font=("Helvetica", time_font_size))
 
-        # Lifelines (horizontal lines for each process)
-        spacing = (height - self.top_margin - 40) / max(1, len(pids) - 1) if len(pids) > 1 else height - self.top_margin - 40
+        # Lifelines - now with responsive layout
         for idx, pid in enumerate(pids):
             y = self.top_margin + idx * spacing
+            # Ensure we stay within canvas bounds
+            if y > canvas_height - 50:
+                y = canvas_height - 50
             self.y_map[pid] = y
-            self.canvas.create_text(15, y, text=pid, font=("Helvetica", 11, "bold"), anchor=tk.E)
-            self.canvas.create_line(self.left_margin, y, self.left_margin + self.max_time * self.time_scale, y,
-                                    fill="black")
+            
+            # Draw process label
+            self.canvas.create_text(self.left_margin - 10, y, text=pid, font=("Helvetica", pid_font_size, "bold"), anchor=tk.E)
+            
+            # Draw lifeline
+            end_x = self.left_margin + self.max_time * self.time_scale
+            if end_x > canvas_width - 20:
+                end_x = canvas_width - 20
+            self.canvas.create_line(self.left_margin, y, end_x, y, fill="black", width=1)
 
-        # Redraw existing events
+        # Redraw events
         for event in self.events:
             if event["type"] == "MESSAGE":
                 self._draw_message(event)
@@ -258,23 +322,33 @@ class GraphicalSimulationUI(tk.Tk):
         t_send = event["time"]
         t_rcv = t_send + self.delay
 
+        # Check if both processes are in y_map
+        if src not in self.y_map or dst not in self.y_map:
+            return
+
         x1 = self.left_margin + t_send * self.time_scale
         x2 = self.left_margin + t_rcv * self.time_scale
         y1 = self.y_map[src]
         y2 = self.y_map[dst]
 
-        self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill="#1f77b4", width=2)
+        self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill="#1f77b4", width=1)
         mid_x = (x1 + x2) / 2
         mid_y = (y1 + y2) / 2
-        self.canvas.create_text(mid_x, mid_y - 8, text=event["content"], fill="#1f77b4", font=("Helvetica", 9))
+        self.canvas.create_text(mid_x, mid_y - 6, text=event["content"], fill="#1f77b4", font=("Helvetica", 7))
 
     def _draw_snapshot(self, event):
         pid = event["pid"]
         t = event["time"]
+        
+        # Check if process is in y_map
+        if pid not in self.y_map:
+            return
+            
         x = self.left_margin + t * self.time_scale
         y = self.y_map[pid]
-        self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="red", outline="")
-        self.canvas.create_text(x, y - 12, text=f"S_{pid}", fill="red", anchor=tk.S)
+        radius = 3
+        self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill="red", outline="")
+        self.canvas.create_text(x, y - 10, text=f"S_{pid}", fill="red", anchor=tk.S, font=("Helvetica", 7))
 
     def _add_event(self, event):
         self.event_counter += 1
@@ -433,6 +507,9 @@ class GraphicalSimulationUI(tk.Tk):
 
             # Exécution
             sim.run()
+
+            # Show results frame
+            self.output_frame.grid()  # Display the results section
 
             # Résultats
             self.output_text.delete("1.0", tk.END)
