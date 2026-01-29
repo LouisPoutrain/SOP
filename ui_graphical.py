@@ -65,13 +65,36 @@ class GraphicalSimulationUI(tk.Tk):
         right = ttk.Frame(middle)
         right.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Canvas
+        # Canvas with scrollbars
         canvas_frame = ttk.LabelFrame(left, text="Insertion graphique")
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.canvas = tk.Canvas(canvas_frame, bg="white")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        # Create a frame for canvas + scrollbars
+        canvas_container = ttk.Frame(canvas_frame)
+        canvas_container.pack(fill=tk.BOTH, expand=True)
+
+        # Horizontal scrollbar
+        h_scrollbar = ttk.Scrollbar(canvas_container, orient=tk.HORIZONTAL)
+        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Vertical scrollbar
+        v_scrollbar = ttk.Scrollbar(canvas_container, orient=tk.VERTICAL)
+        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Canvas
+        self.canvas = tk.Canvas(canvas_container, bg="white", xscrollcommand=h_scrollbar.set, 
+                               yscrollcommand=v_scrollbar.set)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Configure scrollbars to scroll canvas
+        h_scrollbar.config(command=self.canvas.xview)
+        v_scrollbar.config(command=self.canvas.yview)
+
         self.canvas.bind("<Button-1>", self._on_canvas_click)
+        # Allow mouse wheel scrolling
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind("<Button-4>", self._on_mousewheel)  # Linux scroll up
+        self.canvas.bind("<Button-5>", self._on_mousewheel)  # Linux scroll down
 
         # Mode + content
         mode_frame = ttk.LabelFrame(right, text="Mode")
@@ -253,6 +276,21 @@ class GraphicalSimulationUI(tk.Tk):
 
         except ValueError as exc:
             messagebox.showerror("Erreur", str(exc))
+
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling on canvas"""
+        # Determine scroll direction
+        if event.num == 5 or event.delta < 0:
+            direction = 1
+        else:
+            direction = -1
+        
+        # Scroll canvas
+        if event.state & 0x1:  # Shift key - horizontal scroll
+            self.canvas.xview_scroll(direction * 3, tk.UNITS)
+        else:  # Vertical scroll
+            self.canvas.yview_scroll(direction * 3, tk.UNITS)
+        return "break"
 
     def _draw_message(self, event):
         src = event["src"]
