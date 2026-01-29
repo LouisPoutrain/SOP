@@ -18,6 +18,9 @@ class GraphicalSimulationUI(tk.Tk):
         self.show_plot_var = tk.BooleanVar(value=True)
         self.mode_var = tk.StringVar(value="message")
         self.pending_message = None
+        
+        # Process states tracking
+        self.process_states = {}  # {pid: {"messages_to": [...], "messages_from": [...], "snapshots": [...]}}
 
         self.time_scale = 12  # pixels per time unit
         self.top_margin = 60
@@ -78,6 +81,11 @@ class GraphicalSimulationUI(tk.Tk):
         self.msg_content_entry = ttk.Entry(content_frame, width=25)
         self.msg_content_entry.insert(0, "Msg")
         self.msg_content_entry.pack(padx=5, pady=5)
+        
+        # Message status label
+        self.msg_status = ttk.Label(content_frame, text="Cliquez sur source puis destination", 
+                                     font=("Helvetica", 9, "italic"), foreground="gray")
+        self.msg_status.pack(padx=5, pady=2)
 
         # Events list
         events_frame = ttk.LabelFrame(right, text="Événements")
@@ -94,6 +102,18 @@ class GraphicalSimulationUI(tk.Tk):
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Button(buttons_frame, text="Supprimer sélection", command=self._remove_selected).pack(side=tk.LEFT)
         ttk.Button(buttons_frame, text="Vider la liste", command=self._clear_events).pack(side=tk.LEFT, padx=5)
+
+        # Events log (real-time display)
+        log_frame = ttk.LabelFrame(right, text="Journal des événements")
+        log_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+        self.events_log = tk.Text(log_frame, height=6, wrap=tk.WORD, font=("Helvetica", 10))
+        self.events_log.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Process states (real-time display)
+        states_frame = ttk.LabelFrame(right, text="États des Processus")
+        states_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.states_text = tk.Text(states_frame, height=10, wrap=tk.WORD, font=("Helvetica", 9))
+        self.states_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Run section
         run_frame = ttk.Frame(container)
@@ -197,24 +217,29 @@ class GraphicalSimulationUI(tk.Tk):
             # Message mode
             if self.pending_message is None:
                 self.pending_message = {"src": pid, "time": time_val}
+                self.msg_status.config(text=f"Source: {pid} @ t={time_val:.1f} → Cliquez destination", foreground="orange")
                 self.canvas.delete("pending")
                 x = self.left_margin + time_val * self.time_scale
                 self.canvas.create_oval(x - 4, self.y_map[pid] - 4, x + 4, self.y_map[pid] + 4,
-                                        fill="orange", outline="", tags="pending")
+                                        fill="orange", outline="red", width=2, tags="pending")
+                # Draw a vertical line to help locate the source
+                self.canvas.create_line(x, self.top_margin - 10, x, self.canvas.winfo_height() - 20, 
+                                       fill="orange", dash=(4, 4), tags="pending")
             else:
                 src = self.pending_message["src"]
-                time_val = self.pending_message["time"]
+                time_val_src = self.pending_message["time"]
                 dst = pid
                 content = self.msg_content_entry.get().strip() or "Msg"
                 self.pending_message = None
                 self.canvas.delete("pending")
+                self.msg_status.config(text="Cliquez sur source puis destination", foreground="gray")
 
                 if src == dst:
                     messagebox.showerror("Erreur", "Source et destination doivent être différentes.")
                     return
 
                 self._add_event({
-                    "time": time_val,
+                    "time": time_val_src,
                     "type": "MESSAGE",
                     "src": src,
                     "dst": dst,
@@ -261,6 +286,9 @@ class GraphicalSimulationUI(tk.Tk):
             event.get("dst", ""),
             event.get("content", "")
         ))
+        # Log the event and update states
+        self._log_event(event)
+        self._update_process_states()
 
     def _remove_selected(self):
         selection = self.events_tree.selection()
@@ -269,13 +297,105 @@ class GraphicalSimulationUI(tk.Tk):
         for item in selection:
             self.events_tree.delete(item)
             self.events = [e for e in self.events if e.get("id") != item]
+        self._redraw_log()
+        self._update_process_states()
         self._draw_canvas()
 
     def _clear_events(self):
         for item in self.events_tree.get_children():
             self.events_tree.delete(item)
         self.events = []
+        self.process_states = {}
+        self._redraw_log()
+        self._update_process_states()
         self._draw_canvas()
+
+    def _log_event(self, event):
+        """Add event to log display."""
+        log_text = self.events_log.get("1.0", tk.END)
+        if log_text.strip():
+            self.events_log.insert(tk.END, "\n")
+        
+        if event["type"] == "MESSAGE":
+            msg = f"T={event['time']:.1f}: {event['src']} → {event['dst']} ({event['content']})"
+        else:  # SNAPSHOT
+            msg = f"T={event['time']:.1f}: SNAPSHOT {event['pid']}"
+        
+        self.events_log.insert(tk.END, msg)
+        self.events_log.see(tk.END)
+
+    def _redraw_log(self):
+        """Redraw entire log from events."""
+        self.events_log.delete("1.0", tk.END)
+        for i, event in enumerate(sorted(self.events, key=lambda e: e["time"])):
+            if i > 0:
+                self.events_log.insert(tk.END, "\n")
+            
+            if event["type"] == "MESSAGE":
+                msg = f"T={event['time']:.1f}: {event['src']} → {event['dst']} ({event['content']})"
+            else:  # SNAPSHOT
+                msg = f"T={event['time']:.1f}: SNAPSHOT {event['pid']}"
+            
+            self.events_log.insert(tk.END, msg)
+
+    def _update_process_states(self):
+        """Update and display process states based on current events."""
+        pids = self._parse_process_ids()
+        
+        # Initialize states for all processes
+        for pid in pids:
+            if pid not in self.process_states:
+                self.process_states[pid] = {"messages_to": [], "messages_from": [], "snapshots": []}
+        
+        # Clear existing data
+        for pid in pids:
+            self.process_states[pid] = {"messages_to": [], "messages_from": [], "snapshots": []}
+        
+        # Populate from events
+        for event in sorted(self.events, key=lambda e: e["time"]):
+            if event["type"] == "MESSAGE":
+                src = event["src"]
+                dst = event["dst"]
+                msg = f"→ {dst} @ t={event['time']:.1f} ({event['content']})"
+                self.process_states[src]["messages_to"].append(msg)
+                
+                msg_in = f"← {src} @ t={event['time'] + self.delay:.1f} ({event['content']})"
+                self.process_states[dst]["messages_from"].append(msg_in)
+            
+            elif event["type"] == "SNAPSHOT":
+                pid = event["pid"]
+                snap = f"Snapshot @ t={event['time']:.1f}"
+                self.process_states[pid]["snapshots"].append(snap)
+        
+        # Display in states text widget
+        self.states_text.delete("1.0", tk.END)
+        for pid in pids:
+            self.states_text.insert(tk.END, f"\n{'='*35}\n")
+            self.states_text.insert(tk.END, f"PROCESSUS {pid}\n")
+            self.states_text.insert(tk.END, f"{'='*35}\n")
+            
+            state = self.process_states[pid]
+            
+            self.states_text.insert(tk.END, f"Snapshots:\n")
+            if state["snapshots"]:
+                for snap in state["snapshots"]:
+                    self.states_text.insert(tk.END, f"  • {snap}\n")
+            else:
+                self.states_text.insert(tk.END, f"  (aucun)\n")
+            
+            self.states_text.insert(tk.END, f"\nMessages envoyés:\n")
+            if state["messages_to"]:
+                for msg in state["messages_to"]:
+                    self.states_text.insert(tk.END, f"  • {msg}\n")
+            else:
+                self.states_text.insert(tk.END, f"  (aucun)\n")
+            
+            self.states_text.insert(tk.END, f"\nMessages reçus:\n")
+            if state["messages_from"]:
+                for msg in state["messages_from"]:
+                    self.states_text.insert(tk.END, f"  • {msg}\n")
+            else:
+                self.states_text.insert(tk.END, f"  (aucun)\n")
 
     def _run_simulation(self):
         try:
